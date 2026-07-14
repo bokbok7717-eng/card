@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>💳 상환 관리장</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#f4f7fc;font-family:sans-serif;padding-bottom:70px}
+
+.top-bar{position:fixed;top:0;left:0;right:0;background:#3d5a99;color:#fff;z-index:200;padding:8px 16px;display:flex;align-items:center;gap:8px;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+.top-bar .ttl{font-size:14px;font-weight:700;flex-shrink:0;white-space:nowrap}
+.top-icon-btn{background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:6px;padding:5px 9px;font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0}
+
+.tab-bar{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #e0e6f0;display:flex;z-index:100;box-shadow:0 -2px 8px rgba(61,90,153,.08)}
+.tb{flex:1;padding:9px 0 7px;border:none;background:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:10.5px;color:#a0acc4;font-family:inherit}
+.tb.active{color:#3d5a99;font-weight:700}
+.tb .ic{font-size:19px;line-height:1}
+
+.tab-content{display:none;padding:46px 14px 14px;max-width:640px;margin:0 auto}
+.tab-content.active{display:block}
+
+.box{background:#fff;border-radius:14px;padding:14px;margin-bottom:12px;border:1px solid #e0e6f0;box-shadow:0 1px 4px rgba(61,90,153,.05)}
+.box-title{font-size:13px;font-weight:700;color:#3d5a99;margin-bottom:12px;display:flex;align-items:center;gap:6px}
+
+/* 요약 카드 */
+.summary-card{background:linear-gradient(135deg,#3d5a99,#5b7cca);border-radius:16px;padding:18px;margin-bottom:14px;color:#fff}
+.sum-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+.sum-row:last-child{margin-bottom:0}
+.sum-label{font-size:12px;opacity:.85}
+.sum-value{font-size:20px;font-weight:700}
+.sum-row.sub .sum-label{font-size:11px;opacity:.7}
+.sum-row.sub .sum-value{font-size:13px;font-weight:600;opacity:.9}
+
+/* 필터 */
+.filter-row{display:flex;gap:6px;margin-bottom:12px}
+.ff{flex:1;background:#fff;border:1.5px solid #e0e6f0;border-radius:10px;padding:8px;font-size:12px;color:#a0acc4;cursor:pointer;font-family:inherit}
+.ff.active{background:#3d5a99;border-color:#3d5a99;color:#fff;font-weight:700}
+
+/* 아이템 카드 */
+.item-card{background:#fff;border-radius:14px;padding:14px;margin-bottom:10px;border:1px solid #e0e6f0;cursor:pointer;box-shadow:0 1px 3px rgba(61,90,153,.05)}
+.item-card:active{transform:scale(.98)}
+.ic-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.ic-type{font-size:10px;padding:3px 8px;border-radius:8px;font-weight:700}
+.type-installment{background:#fff3e0;color:#e08a3d}
+.type-loan{background:#e8eefb;color:#3d5a99}
+.ic-cat{font-size:11px;color:#a0acc4}
+.ic-name{font-size:15px;font-weight:700;color:#2a3550;margin-bottom:8px}
+.ic-progress-bar{height:8px;background:#eef2fa;border-radius:4px;overflow:hidden;margin-bottom:6px}
+.ic-progress-fill{height:100%;background:linear-gradient(90deg,#5b7cca,#3d5a99);border-radius:4px}
+.ic-meta{display:flex;justify-content:space-between;font-size:11px;color:#a0acc4;margin-bottom:8px}
+.ic-bottom{display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid #f0f3fa}
+.ic-remain{font-size:13px;font-weight:700;color:#3d5a99}
+.ic-payoff{font-size:11px;color:#a0acc4}
+
+.empty-state{text-align:center;padding:50px 20px;color:#b8c2d8}
+.empty-state .ei{font-size:50px;margin-bottom:10px}
+.empty-state p{font-size:13px;line-height:1.6}
+
+/* 폼 */
+.form-group{margin-bottom:12px}
+.form-group label{font-size:11px;color:#8b96b0;display:block;margin-bottom:5px;font-weight:600}
+.form-inp,.form-select{width:100%;border:1.5px solid #e0e6f0;border-radius:8px;padding:10px 12px;font-size:14px;color:#2a3550;outline:none;font-family:inherit;background:#fff}
+.form-inp:focus,.form-select:focus{border-color:#3d5a99}
+.form-textarea{width:100%;border:1.5px solid #e0e6f0;border-radius:8px;padding:10px 12px;font-size:13px;color:#2a3550;outline:none;resize:none;min-height:60px;font-family:inherit;background:#fff}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.toggle-pair{display:flex;gap:6px}
+.toggle-btn{flex:1;padding:10px;border:1.5px solid #e0e6f0;background:#fff;color:#a0acc4;border-radius:8px;font-size:13px;cursor:pointer;font-family:inherit;font-weight:600}
+.toggle-btn.active{border-color:#3d5a99;background:#e8eefb;color:#3d5a99}
+.hint-text{font-size:11px;color:#b8c2d8;margin-top:4px}
+
+.save-btn{width:100%;background:#3d5a99;color:#fff;border:none;border-radius:10px;padding:13px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit}
+.save-btn:active{background:#2f4a80}
+.cancel-btn{width:100%;background:#eef2fa;color:#8b96b0;border:none;border-radius:10px;padding:13px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;margin-bottom:8px}
+.danger-btn{width:100%;background:#fff0ee;color:#e05a4a;border:none;border-radius:10px;padding:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:8px}
+
+/* 완납 탭 */
+.done-item{display:flex;align-items:center;gap:10px;padding:12px 4px;border-bottom:1px solid #f0f3fa}
+.done-item:last-child{border-bottom:none}
+.done-thumb{width:40px;height:40px;border-radius:10px;background:#eef2fa;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.done-name{font-size:13px;font-weight:700;color:#2a3550}
+.done-meta{font-size:11px;color:#a0acc4}
+
+.badge-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:6px}
+.badge-item{text-align:center}
+.badge-icon{width:52px;height:52px;border-radius:50%;background:#eef2fa;display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 4px;filter:grayscale(1) opacity(.4)}
+.badge-icon.on{background:#e8eefb;filter:none}
+.badge-name{font-size:9.5px;color:#b8c2d8}
+.badge-icon.on+.badge-name{color:#3d5a99;font-weight:700}
+
+/* 상세 패널 */
+.detail-panel{position:fixed;inset:0;background:#f4f7fc;z-index:300;display:none;flex-direction:column;overflow-y:auto}
+.detail-panel.open{display:flex}
+.detail-header{background:#3d5a99;padding:14px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0;position:sticky;top:0;z-index:1}
+.detail-header h2{font-size:16px;font-weight:700;color:#fff;flex:1}
+.dh-back{background:none;border:none;color:#fff;font-size:20px;cursor:pointer}
+.detail-body{padding:16px}
+.dp-hero{background:#fff;border-radius:14px;padding:18px;text-align:center;margin-bottom:14px;border:1px solid #e0e6f0}
+.dp-hero-remain{font-size:26px;font-weight:700;color:#3d5a99;margin-bottom:4px}
+.dp-hero-label{font-size:12px;color:#a0acc4;margin-bottom:14px}
+.dp-hero-bar{height:10px;background:#eef2fa;border-radius:5px;overflow:hidden;margin-bottom:8px}
+.dp-hero-fill{height:100%;background:linear-gradient(90deg,#5b7cca,#3d5a99);border-radius:5px}
+.dp-info-row{display:flex;justify-content:space-between;padding:10px 2px;border-bottom:1px solid #f0f3fa;font-size:13px}
+.dp-info-row:last-child{border-bottom:none}
+.dp-info-label{color:#8b96b0}
+.dp-info-value{color:#2a3550;font-weight:600}
+.dp-memo{background:#f9fafc;border-radius:8px;padding:12px;font-size:13px;color:#666;line-height:1.6;margin-top:10px}
+
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.75);color:#fff;padding:8px 18px;border-radius:20px;font-size:12px;display:none;z-index:999;white-space:nowrap}
+
+/* 모달 공통 */
+.modal-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center;padding:20px}
+.modal-ov.open{display:flex}
+.modal-box{background:#fff;border-radius:16px;padding:20px;max-width:340px;width:100%;box-sizing:border-box;max-height:85vh;overflow-y:auto}
+.modal-box h3{font-size:15px;margin-bottom:14px;color:#2a3550}
+.modal-close-btn{width:100%;background:none;border:1.5px solid #e0e6f0;color:#a0acc4;border-radius:8px;padding:9px;font-size:12px;cursor:pointer;font-family:inherit;margin-top:8px}
+.settings-row{display:flex;align-items:center;justify-content:space-between;padding:12px 2px;border-bottom:1px solid #f0f3fa;cursor:pointer;font-size:13px;color:#2a3550}
+.settings-row:last-child{border-bottom:none}
+.settings-arrow{color:#c8d0e4;font-size:15px}
+
+/* 완납 축하 팝업 */
+.celebrate-box{text-align:center}
+.celebrate-emoji{font-size:60px;margin-bottom:8px;animation:celebratePop .5s cubic-bezier(.34,1.56,.64,1)}
+@keyframes celebratePop{0%{transform:scale(.3);opacity:0}60%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}
+.celebrate-title{font-size:17px;font-weight:700;color:#2a3550;margin-bottom:4px}
+.celebrate-sub{font-size:13px;color:#8b96b0;margin-bottom:16px}
+.confetti-wrap{position:relative;height:0;overflow:visible}
+.confetti{position:absolute;top:0;font-size:16px;opacity:0;animation:confettiFall 1.1s ease-in forwards}
+@keyframes confettiFall{0%{opacity:1;transform:translateY(0) rotate(0)}100%{opacity:0;transform:translateY(140px) rotate(360deg)}}
+
+/* 다크모드 */
+body.dark-mode{background:#141821}
+body.dark-mode .top-bar{background:#1e2635}
+body.dark-mode .tab-bar{background:#1a1f2a;border-top-color:#2a3345}
+body.dark-mode .tb{color:#5a6478}
+body.dark-mode .tb.active{color:#7a9aef}
+body.dark-mode .box{background:#1e2430;border-color:#2a3345}
+body.dark-mode .box-title{color:#7a9aef}
+body.dark-mode .summary-card{background:linear-gradient(135deg,#1e2a4a,#2a3a66)}
+body.dark-mode .ff{background:#1e2430;border-color:#2a3345;color:#6a7690}
+body.dark-mode .ff.active{background:#3d5a99;border-color:#3d5a99;color:#fff}
+body.dark-mode .item-card{background:#1e2430;border-color:#2a3345}
+body.dark-mode .ic-name{color:#e8ecf5}
+body.dark-mode .type-installment{background:#3a2a18;color:#ff9d5a}
+body.dark-mode .type-loan{background:#1a2540;color:#7a9aef}
+body.dark-mode .ic-progress-bar{background:#141821}
+body.dark-mode .ic-meta{color:#6a7690}
+body.dark-mode .ic-bottom{border-top-color:#2a3345}
+body.dark-mode .ic-remain{color:#7a9aef}
+body.dark-mode .ic-payoff{color:#6a7690}
+body.dark-mode .empty-state{color:#3a4358}
+body.dark-mode .form-inp,body.dark-mode .form-select,body.dark-mode .form-textarea{background:#141821;border-color:#2a3345;color:#e8ecf5}
+body.dark-mode .form-group label{color:#6a7690}
+body.dark-mode .toggle-btn{background:#141821;border-color:#2a3345;color:#6a7690}
+body.dark-mode .toggle-btn.active{background:#1a2540;border-color:#7a9aef;color:#7a9aef}
+body.dark-mode .cancel-btn{background:#1e2430;color:#6a7690}
+body.dark-mode .hint-text{color:#3a4358}
+body.dark-mode .done-item{border-bottom-color:#2a3345}
+body.dark-mode .done-thumb{background:#141821}
+body.dark-mode .done-name{color:#e8ecf5}
+body.dark-mode .done-meta{color:#6a7690}
+body.dark-mode .badge-icon{background:#141821}
+body.dark-mode .badge-icon.on{background:#1a2540}
+body.dark-mode .detail-panel{background:#141821}
+body.dark-mode .dp-hero{background:#1e2430;border-color:#2a3345}
+body.dark-mode .dp-hero-remain{color:#7a9aef}
+body.dark-mode .dp-hero-label{color:#6a7690}
+body.dark-mode .dp-hero-bar{background:#141821}
+body.dark-mode .dp-info-row{border-bottom-color:#2a3345}
+body.dark-mode .dp-info-label{color:#6a7690}
+body.dark-mode .dp-info-value{color:#e8ecf5}
+body.dark-mode .dp-memo{background:#141821;color:#aab4cc}
+body.dark-mode .modal-box{background:#1e2430;color:#e8ecf5}
+body.dark-mode .modal-box h3{color:#e8ecf5}
+body.dark-mode .modal-close-btn{border-color:#2a3345;color:#6a7690}
+body.dark-mode .settings-row{border-bottom-color:#2a3345;color:#e8ecf5}
+body.dark-mode .celebrate-title{color:#e8ecf5}
+body.dark-mode .celebrate-sub{color:#6a7690}
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <span class="ttl">💳 상환 관리장</span>
+  <div style="margin-left:auto;display:flex;gap:6px">
+    <button class="top-icon-btn" id="dark-toggle-btn" onclick="toggleDarkMode()" title="다크모드">🌙</button>
+    <button class="top-icon-btn" onclick="openSettingsModal()" title="설정">⚙️</button>
+  </div>
+</div>
+
+<!-- 탭1: 홈 -->
+<div class="tab-content active" id="tab-home">
+  <div class="summary-card" id="summary-card"></div>
+  <div id="card-summary-area"></div>
+  <div class="filter-row">
+    <button class="ff active" onclick="setFilter('all',this)">전체</button>
+    <button class="ff" onclick="setFilter('installment',this)">💳 할부</button>
+    <button class="ff" onclick="setFilter('loan',this)">🏦 대출</button>
+  </div>
+  <div id="item-list"></div>
+</div>
+
+<!-- 탭: 카드값 관리 -->
+<div class="tab-content" id="tab-cards">
+  <div class="box" style="display:flex;justify-content:space-between;align-items:center">
+    <div class="box-title" style="margin-bottom:0">💳 내 카드</div>
+    <button onclick="openCardFormModal()" style="background:#3d5a99;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;cursor:pointer;font-family:inherit">+ 카드 추가</button>
+  </div>
+  <div id="card-list"></div>
+</div>
+
+<!-- 탭2: 추가 -->
+<div class="tab-content" id="tab-add">
+  <div class="box">
+    <div class="box-title" id="add-box-title">➕ 새로 등록</div>
+
+    <div class="form-group">
+      <label>종류</label>
+      <div class="toggle-pair">
+        <button class="toggle-btn active" id="type-installment-btn" onclick="setType('installment')">💳 할부</button>
+        <button class="toggle-btn" id="type-loan-btn" onclick="setType('loan')">🏦 대출</button>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>이름 *</label>
+      <input type="text" class="form-inp" id="f-name" placeholder="예: 노트북 할부, 학자금 대출">
+    </div>
+
+    <div class="form-group">
+      <label>카테고리</label>
+      <select class="form-select" id="f-cat"></select>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>총 금액 (원) *</label>
+        <input type="number" class="form-inp" id="f-principal" placeholder="예: 1200000" oninput="suggestMonthly()">
+      </div>
+      <div class="form-group">
+        <label>총 개월수 *</label>
+        <input type="number" class="form-inp" id="f-months" placeholder="예: 12" oninput="suggestMonthly()">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>월 납입액 (원) *</label>
+      <input type="number" class="form-inp" id="f-monthly" placeholder="자동 계산되지만 직접 수정 가능해요">
+      <div class="hint-text" id="monthly-hint"></div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>시작월 *</label>
+        <input type="month" class="form-inp" id="f-start">
+      </div>
+      <div class="form-group">
+        <label>이자율 % (선택)</label>
+        <input type="number" class="form-inp" id="f-rate" placeholder="예: 3.5" step="0.1">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>메모</label>
+      <textarea class="form-textarea" id="f-memo" placeholder="선택 입력"></textarea>
+    </div>
+
+    <button class="cancel-btn" id="add-cancel-btn" style="display:none" onclick="cancelEdit()">취소</button>
+    <button class="save-btn" id="add-save-btn" onclick="saveItem()">💾 저장</button>
+  </div>
+</div>
+
+<!-- 탭3: 완납 기록 -->
+<div class="tab-content" id="tab-done">
+  <div class="box">
+    <div class="box-title">✅ 완납한 것들</div>
+    <div id="done-list"></div>
+  </div>
+  <div class="box">
+    <div class="box-title" style="justify-content:space-between"><span>🏅 뱃지</span><span id="badge-count" style="color:#a0acc4;font-weight:400;font-size:12px"></span></div>
+    <div class="badge-grid" id="badge-grid"></div>
+  </div>
+</div>
+
+<!-- 상세 패널 -->
+<div class="detail-panel" id="detail-panel">
+  <div class="detail-header">
+    <button class="dh-back" onclick="closeDetail()">←</button>
+    <h2 id="dp-name">항목명</h2>
+  </div>
+  <div class="detail-body" id="dp-body"></div>
+</div>
+
+<div class="detail-panel" id="card-detail-panel">
+  <div class="detail-header">
+    <button class="dh-back" onclick="closeCardDetail()">←</button>
+    <h2 id="cdp-name">카드명</h2>
+  </div>
+  <div class="detail-body" id="cdp-body"></div>
+</div>
+
+<nav class="tab-bar">
+  <button class="tb active" id="tbtn-home" onclick="goTab('home')"><span class="ic">🏠</span>홈</button>
+  <button class="tb" id="tbtn-cards" onclick="goTab('cards')"><span class="ic">💳</span>카드</button>
+  <button class="tb" id="tbtn-add" onclick="goTab('add')"><span class="ic">➕</span>추가</button>
+  <button class="tb" id="tbtn-done" onclick="goTab('done')"><span class="ic">✅</span>완납기록</button>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<!-- 설정 모달 -->
+<div class="modal-ov" id="settings-modal">
+  <div class="modal-box">
+    <h3>⚙️ 설정</h3>
+    <div class="settings-row" onclick="toggleDarkMode()"><span>🌗 다크모드</span><span id="settings-dark-state" style="color:#3d5a99;font-size:12px;font-weight:700"></span></div>
+    <div class="settings-row" onclick="openBackupModal()"><span>💾 백업 / 복원</span><span class="settings-arrow">›</span></div>
+    <button class="modal-close-btn" onclick="closeSettingsModal()">닫기</button>
+  </div>
+</div>
+
+<!-- 백업 모달 -->
+<div class="modal-ov" id="backup-modal">
+  <div class="modal-box">
+    <h3>💾 백업 / 복원</h3>
+    <p style="font-size:12px;color:#8b96b0;margin-bottom:14px;line-height:1.6">등록한 할부/대출 데이터를 파일로 백업하고 복원해요.</p>
+    <button onclick="downloadBackup()" style="width:100%;background:#3d5a99;color:#fff;border:none;border-radius:8px;padding:11px;font-size:13px;cursor:pointer;margin-bottom:8px;font-family:inherit">⬇️ 백업 파일 다운로드</button>
+    <label style="display:block;width:100%;background:#eef2fa;color:#3d5a99;border-radius:8px;padding:11px;font-size:13px;cursor:pointer;text-align:center;margin-bottom:8px;box-sizing:border-box">
+      ⬆️ 백업 파일 불러오기
+      <input type="file" accept=".json" style="display:none" onchange="restoreBackup(event)">
+    </label>
+    <button class="modal-close-btn" onclick="closeBackupModal()">닫기</button>
+  </div>
+</div>
+
+<!-- 카드 추가 모달 -->
+<div class="modal-ov" id="card-form-modal">
+  <div class="modal-box">
+    <h3 id="card-form-title">💳 카드 추가</h3>
+    <div class="form-group">
+      <label>카드 이름 *</label>
+      <input type="text" class="form-inp" id="cf-name" placeholder="예: 신한카드">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>현재 한도 (원) *</label>
+        <input type="number" class="form-inp" id="cf-limit" placeholder="예: 3000000">
+      </div>
+      <div class="form-group">
+        <label>목표 한도 (원) *</label>
+        <input type="number" class="form-inp" id="cf-goal" placeholder="예: 1000000">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>현재 카드값 (사용액, 원)</label>
+      <input type="number" class="form-inp" id="cf-balance" placeholder="예: 850000">
+    </div>
+    <div class="hint-text" style="margin-bottom:10px">한도는 낮추는 게 목표니까, 목표 한도는 지금보다 낮은 금액으로 넣어주세요.</div>
+    <button class="save-btn" onclick="saveCard()">💾 저장</button>
+    <button class="modal-close-btn" onclick="closeCardFormModal()">취소</button>
+  </div>
+</div>
+
+<!-- 완납 축하 모달 -->
+<div class="modal-ov" id="celebrate-modal">
+  <div class="modal-box celebrate-box">
+    <div class="confetti-wrap" id="confetti-wrap"></div>
+    <div class="celebrate-emoji">🎉</div>
+    <div class="celebrate-title" id="celebrate-title">완납했어요!</div>
+    <div class="celebrate-sub" id="celebrate-sub"></div>
+    <button class="save-btn" onclick="closeCelebrateModal()">확인</button>
+  </div>
+</div>
+
+<script>
+var SAVE_KEY='loan_tracker_v1';
+var CARD_KEY='loan_tracker_cards_v1';
+var items=[];
+var cards=[];
+var curFilter='all';
+var curType='installment';
+var editingId=null;
+var editingCardId=null;
+var viewId=null;
+var viewCardId=null;
+
+var INSTALLMENT_CATS=['가전','가구','자동차','여행','생활용품','기타'];
+var LOAN_CATS=['학자금','전세자금','신용대출','마이너스통장','기타'];
+
+function load(){
+  try{ var r=localStorage.getItem(SAVE_KEY); if(r) items=JSON.parse(r); }catch(e){ items=[]; }
+}
+function save(){ localStorage.setItem(SAVE_KEY, JSON.stringify(items)); }
+function loadCards(){
+  try{ var r=localStorage.getItem(CARD_KEY); if(r) cards=JSON.parse(r); }catch(e){ cards=[]; }
+}
+function saveCards(){ localStorage.setItem(CARD_KEY, JSON.stringify(cards)); }
+function fmtDateToday(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function toast(msg){var t=document.getElementById('toast');t.textContent=msg;t.style.display='block';clearTimeout(toast._t);toast._t=setTimeout(function(){t.style.display='none';},1800);}
+
+function goTab(id){
+  document.querySelectorAll('.tab-content').forEach(function(el){el.classList.remove('active');});
+  document.querySelectorAll('.tb').forEach(function(el){el.classList.remove('active');});
+  document.getElementById('tab-'+id).classList.add('active');
+  document.getElementById('tbtn-'+id).classList.add('active');
+  if(id==='home') renderHome();
+  if(id==='done') renderDone();
+  if(id==='cards') renderCards();
+}
+
+function setFilter(f, btn){
+  curFilter=f;
+  document.querySelectorAll('.ff').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  renderHome();
+}
+
+// ===== 날짜/계산 유틸 =====
+function getYM(d){ d=d||new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+function monthsBetween(startYM, nowYM){
+  var s=startYM.split('-'), n=nowYM.split('-');
+  return (+n[0]-+s[0])*12 + (+n[1]-+s[1]);
+}
+function getPaidMonths(item){
+  var elapsed=monthsBetween(item.startDate, getYM())+1;
+  if(elapsed<0) elapsed=0;
+  if(elapsed>item.totalMonths) elapsed=item.totalMonths;
+  return elapsed;
+}
+function getRemainingMonths(item){ return item.totalMonths-getPaidMonths(item); }
+function getRemainingAmount(item){ return Math.max(0, getRemainingMonths(item)*item.monthlyPayment); }
+function getPayoffYM(item){
+  var s=item.startDate.split('-');
+  var y=+s[0], m=+s[1]+item.totalMonths-1;
+  y += Math.floor((m-1)/12);
+  m = ((m-1)%12)+1;
+  return y+'-'+String(m).padStart(2,'0');
+}
+function isCompleted(item){ return !!item.completed || getRemainingMonths(item)<=0; }
+function getTotalPaidAmount(){
+  return items.reduce(function(sum,item){ return sum+getPaidMonths(item)*item.monthlyPayment; },0);
+}
+function fmtYM(ym){ var p=ym.split('-'); return p[0]+'년 '+parseInt(p[1])+'월'; }
+
+// ===== 홈 렌더 =====
+function renderHome(){
+  var all=items.filter(function(i){return !isCompleted(i);});
+  var thisMonthTotal=all.reduce(function(s,i){return s+i.monthlyPayment;},0);
+  var totalRemaining=all.reduce(function(s,i){return s+getRemainingAmount(i);},0);
+
+  document.getElementById('summary-card').innerHTML=
+    '<div class="sum-row"><span class="sum-label">이번 달 총 상환액</span><span class="sum-value">'+thisMonthTotal.toLocaleString()+'원</span></div>'
+    +'<div class="sum-row sub"><span class="sum-label">남은 총 원금</span><span class="sum-value">'+totalRemaining.toLocaleString()+'원</span></div>'
+    +'<div class="sum-row sub"><span class="sum-label">진행 중인 항목</span><span class="sum-value">'+all.length+'건</span></div>';
+
+  var list=all;
+  if(curFilter!=='all') list=list.filter(function(i){return i.type===curFilter;});
+  list.sort(function(a,b){return getRemainingMonths(a)-getRemainingMonths(b);});
+
+  var listEl=document.getElementById('item-list');
+  if(list.length===0){
+    listEl.innerHTML='<div class="empty-state"><div class="ei">💳</div><p>등록된 항목이 없어요<br>새로 등록해보세요!</p></div>';
+  } else {
+    listEl.innerHTML=list.map(itemCardHtml).join('');
+  }
+  renderCardSummaryOnHome();
+}
+
+function renderCardSummaryOnHome(){
+  var el=document.getElementById('card-summary-area');
+  if(!el) return;
+  if(cards.length===0){ el.innerHTML=''; return; }
+  var totalBalance=cards.reduce(function(s,c){return s+c.currentBalance;},0);
+  var goalReachedCount=cards.filter(function(c){return c.currentLimit<=c.goalLimit;}).length;
+  el.innerHTML='<div class="box" onclick="goTab(\'cards\')" style="cursor:pointer;margin-bottom:12px">'
+    +'<div class="box-title" style="justify-content:space-between"><span>💳 카드값 현황</span><span style="color:#a0acc4;font-weight:400;font-size:11px">'+cards.length+'장 관리 중</span></div>'
+    +'<div class="ic-meta"><span>총 카드값 '+totalBalance.toLocaleString()+'원</span><span>목표 달성 '+goalReachedCount+'/'+cards.length+'</span></div>'
+    +'</div>';
+}
+
+function itemCardHtml(item){
+  var paid=getPaidMonths(item), remain=getRemainingMonths(item);
+  var pct=Math.round(paid/item.totalMonths*100);
+  var payoff=getPayoffYM(item);
+  return '<div class="item-card" onclick="openDetail(\''+item.id+'\')">'
+    +'<div class="ic-top"><span class="ic-type '+(item.type==='loan'?'type-loan':'type-installment')+'">'+(item.type==='loan'?'🏦 대출':'💳 할부')+'</span><span class="ic-cat">'+item.category+'</span></div>'
+    +'<div class="ic-name">'+item.name+'</div>'
+    +'<div class="ic-progress-bar"><div class="ic-progress-fill" style="width:'+pct+'%"></div></div>'
+    +'<div class="ic-meta"><span>'+paid+'/'+item.totalMonths+'개월 ('+pct+'%)</span><span>'+(remain>0?remain+'개월 남음':'이번달 완납')+'</span></div>'
+    +'<div class="ic-bottom"><span class="ic-remain">잔액 '+getRemainingAmount(item).toLocaleString()+'원</span><span class="ic-payoff">완납예정 '+fmtYM(payoff)+'</span></div>'
+    +'</div>';
+}
+
+// ===== 카드값 관리 =====
+function getLimitProgress(c){
+  if(c.startLimit<=c.goalLimit) return 100;
+  var pct=Math.round((c.startLimit-c.currentLimit)/(c.startLimit-c.goalLimit)*100);
+  return Math.max(0, Math.min(100, pct));
+}
+function renderCards(){
+  var listEl=document.getElementById('card-list');
+  if(cards.length===0){
+    listEl.innerHTML='<div class="empty-state"><div class="ei">💳</div><p>등록된 카드가 없어요<br>+ 카드 추가로 시작해보세요!</p></div>';
+  } else {
+    listEl.innerHTML=cards.map(cardItemHtml).join('');
+  }
+}
+function cardItemHtml(c){
+  var progress=getLimitProgress(c);
+  var goalReached=c.currentLimit<=c.goalLimit;
+  return '<div class="item-card" onclick="openCardDetail(\''+c.id+'\')">'
+    +'<div class="ic-top"><span class="ic-type type-loan">💳 '+c.name+'</span>'+(goalReached?'<span class="ic-cat" style="color:#4caf6f;font-weight:700">🎯 목표 달성</span>':'<span class="ic-cat">목표 '+c.goalLimit.toLocaleString()+'원</span>')+'</div>'
+    +'<div class="ic-name">현재 한도 '+c.currentLimit.toLocaleString()+'원</div>'
+    +'<div class="ic-progress-bar"><div class="ic-progress-fill" style="width:'+progress+'%"></div></div>'
+    +'<div class="ic-meta"><span>한도 인하 진행률 '+progress+'%</span></div>'
+    +'<div class="ic-bottom"><span class="ic-remain">카드값 '+c.currentBalance.toLocaleString()+'원</span><span class="ic-payoff">'+(c.balanceUpdatedAt?'업데이트 '+new Date(c.balanceUpdatedAt).toLocaleDateString():'')+'</span></div>'
+    +'</div>';
+}
+
+function openCardFormModal(){
+  editingCardId=null;
+  document.getElementById('card-form-title').textContent='💳 카드 추가';
+  document.getElementById('cf-name').value='';
+  document.getElementById('cf-limit').value='';
+  document.getElementById('cf-goal').value='';
+  document.getElementById('cf-balance').value='';
+  document.getElementById('card-form-modal').classList.add('open');
+}
+function closeCardFormModal(){ document.getElementById('card-form-modal').classList.remove('open'); }
+
+function saveCard(){
+  var name=document.getElementById('cf-name').value.trim();
+  var limit=+document.getElementById('cf-limit').value;
+  var goal=+document.getElementById('cf-goal').value;
+  var balance=+document.getElementById('cf-balance').value||0;
+  if(!name){toast('카드 이름을 입력해주세요!');return;}
+  if(!limit||limit<=0){toast('현재 한도를 입력해주세요!');return;}
+  if(!goal||goal<=0){toast('목표 한도를 입력해주세요!');return;}
+
+  cards.unshift({
+    id:Date.now()+'', name:name,
+    startLimit:limit, currentLimit:limit, goalLimit:goal,
+    currentBalance:balance, balanceUpdatedAt:Date.now(),
+    limitHistory:[{date:fmtDateToday(), limit:limit, memo:'최초 등록'}],
+    createdAt:Date.now()
+  });
+  saveCards();
+  closeCardFormModal();
+  renderCards();
+  renderHome();
+  toast('✅ 카드가 등록됐어요!');
+  checkBadges();
+}
+
+function openCardDetail(id){
+  viewCardId=id;
+  var c=cards.find(function(x){return x.id===id;});
+  if(!c) return;
+  document.getElementById('cdp-name').textContent=c.name;
+  var progress=getLimitProgress(c);
+  var goalReached=c.currentLimit<=c.goalLimit;
+
+  var body='<div class="dp-hero">';
+  body+='<div class="dp-hero-remain">'+c.currentLimit.toLocaleString()+'원</div>';
+  body+='<div class="dp-hero-label">현재 한도'+(goalReached?' · 🎯 목표 달성!':' · 목표 '+c.goalLimit.toLocaleString()+'원까지')+'</div>';
+  body+='<div class="dp-hero-bar"><div class="dp-hero-fill" style="width:'+progress+'%"></div></div>';
+  body+='<div style="font-size:11px;color:#a0acc4">한도 인하 진행률 '+progress+'%</div>';
+  body+='</div>';
+
+  body+='<div class="box">';
+  body+='<div class="dp-info-row"><span class="dp-info-label">현재 카드값</span><span class="dp-info-value">'+c.currentBalance.toLocaleString()+'원</span></div>';
+  body+='<div class="dp-info-row"><span class="dp-info-label">처음 한도</span><span class="dp-info-value">'+c.startLimit.toLocaleString()+'원</span></div>';
+  body+='<div class="dp-info-row"><span class="dp-info-label">목표 한도</span><span class="dp-info-value">'+c.goalLimit.toLocaleString()+'원</span></div>';
+  body+='</div>';
+
+  body+='<button class="save-btn" style="margin-bottom:8px" onclick="promptLowerLimit(\''+c.id+'\')">📉 한도 낮췄어요</button>';
+  body+='<button class="save-btn" style="background:#5b7cca;margin-bottom:8px" onclick="promptUpdateBalance(\''+c.id+'\')">🔄 카드값 업데이트</button>';
+
+  if(c.limitHistory && c.limitHistory.length>0){
+    body+='<div class="box"><div class="box-title">📜 한도 변경 이력</div>';
+    c.limitHistory.slice().reverse().forEach(function(h){
+      body+='<div class="dp-info-row"><span class="dp-info-label">'+h.date+(h.memo?' · '+h.memo:'')+'</span><span class="dp-info-value">'+h.limit.toLocaleString()+'원</span></div>';
+    });
+    body+='</div>';
+  }
+
+  body+='<button class="danger-btn" onclick="deleteCard(\''+c.id+'\')">🗑️ 카드 삭제</button>';
+
+  document.getElementById('cdp-body').innerHTML=body;
+  document.getElementById('card-detail-panel').classList.add('open');
+}
+function closeCardDetail(){ document.getElementById('card-detail-panel').classList.remove('open'); viewCardId=null; }
+
+function promptLowerLimit(id){
+  var c=cards.find(function(x){return x.id===id;});
+  if(!c) return;
+  var val=prompt('새 한도를 입력해주세요 (원)', c.currentLimit);
+  if(val===null) return;
+  var num=parseInt(val.replace(/[^0-9]/g,''));
+  if(!num||num<=0){ toast('올바른 숫자를 입력해주세요'); return; }
+  var memo=prompt('메모 (선택 입력, 없으면 그냥 확인 눌러도 돼요)','')||'';
+  if(!c.limitHistory) c.limitHistory=[];
+  c.limitHistory.push({date:fmtDateToday(), limit:num, memo:memo});
+  c.currentLimit=num;
+  saveCards();
+  openCardDetail(id);
+  renderCards();
+  renderHome();
+  toast(num<=c.goalLimit?'🎯 목표 한도 달성했어요!':'📉 한도가 낮아졌어요');
+  checkBadges();
+}
+function promptUpdateBalance(id){
+  var c=cards.find(function(x){return x.id===id;});
+  if(!c) return;
+  var val=prompt('현재 카드값(사용액)을 입력해주세요 (원)', c.currentBalance);
+  if(val===null) return;
+  var num=parseInt(val.replace(/[^0-9]/g,''));
+  if(isNaN(num)||num<0){ toast('올바른 숫자를 입력해주세요'); return; }
+  c.currentBalance=num;
+  c.balanceUpdatedAt=Date.now();
+  saveCards();
+  openCardDetail(id);
+  renderCards();
+  renderHome();
+  toast('카드값이 업데이트됐어요');
+}
+function deleteCard(id){
+  if(!confirm('이 카드를 삭제할까요?')) return;
+  cards=cards.filter(function(x){return x.id!==id;});
+  saveCards();
+  closeCardDetail();
+  renderCards();
+  renderHome();
+  toast('삭제됐어요');
+}
+
+
+// ===== 폼 =====
+function setType(t){
+  curType=t;
+  document.getElementById('type-installment-btn').classList.toggle('active', t==='installment');
+  document.getElementById('type-loan-btn').classList.toggle('active', t==='loan');
+  renderCatOptions();
+}
+function renderCatOptions(){
+  var sel=document.getElementById('f-cat');
+  var cats = curType==='loan' ? LOAN_CATS : INSTALLMENT_CATS;
+  sel.innerHTML=cats.map(function(c){return '<option>'+c+'</option>';}).join('');
+}
+function suggestMonthly(){
+  var principal=+document.getElementById('f-principal').value||0;
+  var months=+document.getElementById('f-months').value||0;
+  var hint=document.getElementById('monthly-hint');
+  if(principal>0 && months>0){
+    var suggested=Math.round(principal/months);
+    document.getElementById('f-monthly').value=suggested;
+    hint.textContent='총 금액 ÷ 개월수로 자동 계산했어요. 이자 등으로 실제 금액이 다르면 직접 수정하세요.';
+  } else {
+    hint.textContent='';
+  }
+}
+
+function saveItem(){
+  var name=document.getElementById('f-name').value.trim();
+  var principal=+document.getElementById('f-principal').value;
+  var months=+document.getElementById('f-months').value;
+  var monthly=+document.getElementById('f-monthly').value;
+  var start=document.getElementById('f-start').value;
+  var cat=document.getElementById('f-cat').value;
+  var rate=document.getElementById('f-rate').value;
+  var memo=document.getElementById('f-memo').value.trim();
+
+  if(!name){toast('이름을 입력해주세요!');return;}
+  if(!principal||principal<=0){toast('총 금액을 입력해주세요!');return;}
+  if(!months||months<=0){toast('총 개월수를 입력해주세요!');return;}
+  if(!monthly||monthly<=0){toast('월 납입액을 입력해주세요!');return;}
+  if(!start){toast('시작월을 선택해주세요!');return;}
+
+  if(editingId){
+    var it=items.find(function(x){return x.id===editingId;});
+    if(it){
+      it.name=name; it.type=curType; it.category=cat;
+      it.principal=principal; it.totalMonths=months; it.monthlyPayment=monthly;
+      it.startDate=start; it.interestRate=rate?parseFloat(rate):null; it.memo=memo;
+    }
+    toast('✅ 수정됐어요!');
+  } else {
+    items.unshift({
+      id:Date.now()+'', type:curType, name:name, category:cat,
+      principal:principal, totalMonths:months, monthlyPayment:monthly,
+      startDate:start, interestRate:rate?parseFloat(rate):null, memo:memo,
+      completed:false, completedAt:null, createdAt:Date.now()
+    });
+    toast('✅ 등록됐어요!');
+  }
+  save();
+  resetForm();
+  checkAutoCompletions();
+  goTab('home');
+}
+
+function resetForm(){
+  editingId=null;
+  document.getElementById('add-box-title').textContent='➕ 새로 등록';
+  document.getElementById('add-cancel-btn').style.display='none';
+  document.getElementById('add-save-btn').textContent='💾 저장';
+  document.getElementById('f-name').value='';
+  document.getElementById('f-principal').value='';
+  document.getElementById('f-months').value='';
+  document.getElementById('f-monthly').value='';
+  document.getElementById('f-start').value='';
+  document.getElementById('f-rate').value='';
+  document.getElementById('f-memo').value='';
+  document.getElementById('monthly-hint').textContent='';
+  setType('installment');
+}
+function cancelEdit(){ resetForm(); goTab('home'); }
+
+// ===== 상세 =====
+function openDetail(id){
+  viewId=id;
+  var item=items.find(function(x){return x.id===id;});
+  if(!item) return;
+  document.getElementById('dp-name').textContent=item.name;
+  var paid=getPaidMonths(item), remain=getRemainingMonths(item);
+  var pct=Math.round(paid/item.totalMonths*100);
+  var payoff=getPayoffYM(item);
+  var completed=isCompleted(item);
+
+  var body='<div class="dp-hero">';
+  body+='<div class="dp-hero-remain">'+(completed?'완납 완료 🎉':getRemainingAmount(item).toLocaleString()+'원 남음')+'</div>';
+  body+='<div class="dp-hero-label">'+(completed?'수고하셨어요!':remain+'개월 남았어요 · 완납예정 '+fmtYM(payoff))+'</div>';
+  body+='<div class="dp-hero-bar"><div class="dp-hero-fill" style="width:'+pct+'%"></div></div>';
+  body+='<div style="font-size:11px;color:#a0acc4">'+paid+' / '+item.totalMonths+'개월 납입 ('+pct+'%)</div>';
+  body+='</div>';
+
+  body+='<div class="box">';
+  body+='<div class="dp-info-row"><span class="dp-info-label">종류</span><span class="dp-info-value">'+(item.type==='loan'?'🏦 대출':'💳 할부')+'</span></div>';
+  body+='<div class="dp-info-row"><span class="dp-info-label">카테고리</span><span class="dp-info-value">'+item.category+'</span></div>';
+  body+='<div class="dp-info-row"><span class="dp-info-label">총 금액</span><span class="dp-info-value">'+item.principal.toLocaleString()+'원</span></div>';
+  body+='<div class="dp-info-row"><span class="dp-info-label">월 납입액</span><span class="dp-info-value">'+item.monthlyPayment.toLocaleString()+'원</span></div>';
+  body+='<div class="dp-info-row"><span class="dp-info-label">시작월</span><span class="dp-info-value">'+fmtYM(item.startDate)+'</span></div>';
+  if(item.interestRate) body+='<div class="dp-info-row"><span class="dp-info-label">이자율</span><span class="dp-info-value">'+item.interestRate+'%</span></div>';
+  body+='</div>';
+
+  if(item.memo){
+    body+='<div class="box"><div class="dp-memo">'+item.memo+'</div></div>';
+  }
+
+  if(!completed){
+    body+='<button class="save-btn" style="margin-bottom:8px" onclick="editItem(\''+item.id+'\')">✏️ 수정하기</button>';
+    body+='<button class="save-btn" style="background:#4caf6f;margin-bottom:8px" onclick="markEarlyPayoff(\''+item.id+'\')">🎉 조기완납 처리</button>';
+  }
+  body+='<button class="danger-btn" onclick="deleteItem(\''+item.id+'\')">🗑️ 삭제</button>';
+
+  document.getElementById('dp-body').innerHTML=body;
+  document.getElementById('detail-panel').classList.add('open');
+}
+function closeDetail(){ document.getElementById('detail-panel').classList.remove('open'); viewId=null; }
+
+function editItem(id){
+  var item=items.find(function(x){return x.id===id;});
+  if(!item) return;
+  editingId=item.id;
+  closeDetail();
+  goTab('add');
+  document.getElementById('add-box-title').textContent='✏️ 수정';
+  document.getElementById('add-cancel-btn').style.display='block';
+  document.getElementById('add-save-btn').textContent='💾 수정 완료';
+  setType(item.type);
+  document.getElementById('f-name').value=item.name;
+  document.getElementById('f-principal').value=item.principal;
+  document.getElementById('f-months').value=item.totalMonths;
+  document.getElementById('f-monthly').value=item.monthlyPayment;
+  document.getElementById('f-start').value=item.startDate;
+  document.getElementById('f-rate').value=item.interestRate||'';
+  document.getElementById('f-memo').value=item.memo||'';
+  document.getElementById('f-cat').value=item.category;
+}
+
+function deleteItem(id){
+  if(!confirm('이 항목을 삭제할까요?')) return;
+  items=items.filter(function(x){return x.id!==id;});
+  save();
+  closeDetail();
+  renderHome();
+  toast('삭제됐어요');
+}
+
+function markEarlyPayoff(id){
+  if(!confirm('조기완납 처리할까요? 남은 잔액이 0으로 처리돼요.')) return;
+  var item=items.find(function(x){return x.id===id;});
+  if(!item) return;
+  item.completed=true; item.completedAt=Date.now();
+  save();
+  closeDetail();
+  renderHome();
+  showCelebration(item);
+}
+
+// ===== 자동 완납 감지 =====
+function checkAutoCompletions(){
+  var newlyCompleted=[];
+  items.forEach(function(item){
+    if(!item.completed && getRemainingMonths(item)<=0){
+      item.completed=true; item.completedAt=Date.now();
+      newlyCompleted.push(item);
+    }
+  });
+  if(newlyCompleted.length>0){
+    save();
+    showCelebration(newlyCompleted[0]);
+  }
+}
+
+function showCelebration(item){
+  document.getElementById('celebrate-title').textContent=item.name+' 완납!';
+  document.getElementById('celebrate-sub').textContent='총 '+item.principal.toLocaleString()+'원을 다 갚았어요 🎉';
+  var wrap=document.getElementById('confetti-wrap');
+  var colors=['🎉','✨','🎊','💰','⭐'];
+  wrap.innerHTML='';
+  for(var i=0;i<10;i++){
+    var c=document.createElement('span');
+    c.className='confetti';
+    c.textContent=colors[Math.floor(Math.random()*colors.length)];
+    c.style.left=(10+Math.random()*80)+'%';
+    c.style.animationDelay=(Math.random()*0.3)+'s';
+    wrap.appendChild(c);
+  }
+  document.getElementById('celebrate-modal').classList.add('open');
+  checkBadges();
+}
+function closeCelebrateModal(){ document.getElementById('celebrate-modal').classList.remove('open'); }
+
+// ===== 완납 기록 탭 =====
+function renderDone(){
+  var done=items.filter(isCompleted).sort(function(a,b){return (b.completedAt||0)-(a.completedAt||0);});
+  var listEl=document.getElementById('done-list');
+  if(done.length===0){
+    listEl.innerHTML='<div class="empty-state" style="padding:24px 0"><div class="ei" style="font-size:34px">✅</div><p>아직 완납한 항목이 없어요</p></div>';
+  } else {
+    listEl.innerHTML=done.map(function(item){
+      return '<div class="done-item" onclick="openDetail(\''+item.id+'\')">'
+        +'<div class="done-thumb">'+(item.type==='loan'?'🏦':'💳')+'</div>'
+        +'<div><div class="done-name">'+item.name+'</div><div class="done-meta">'+item.principal.toLocaleString()+'원 · '+item.totalMonths+'개월 완납</div></div>'
+        +'</div>';
+    }).join('');
+  }
+  renderBadges();
+}
+
+var BADGES=[
+  {id:'first',name:'첫 등록',icon:'📝',check:function(){return items.length>=1;}},
+  {id:'firstdone',name:'첫 완납',icon:'🎉',check:function(){return items.filter(isCompleted).length>=1;}},
+  {id:'done3',name:'완납 3개',icon:'🥉',check:function(){return items.filter(isCompleted).length>=3;}},
+  {id:'done10',name:'완납 10개',icon:'🏆',check:function(){return items.filter(isCompleted).length>=10;}},
+  {id:'long',name:'장기전 클리어',icon:'💪',check:function(){return items.some(function(i){return isCompleted(i)&&i.totalMonths>=24;});}},
+  {id:'multi3',name:'동시 관리 3개',icon:'🧩',check:function(){return items.filter(function(i){return !isCompleted(i);}).length>=3;}},
+  {id:'paid100',name:'누적상환 100만',icon:'💰',check:function(){return getTotalPaidAmount()>=1000000;}},
+  {id:'paid1000',name:'누적상환 1000만',icon:'💎',check:function(){return getTotalPaidAmount()>=10000000;}},
+  {id:'firstlower',name:'첫 한도 인하',icon:'📉',check:function(){return cards.some(function(c){return c.limitHistory && c.limitHistory.length>1;});}},
+  {id:'goalcard',name:'카드 목표 달성',icon:'🎯',check:function(){return cards.some(function(c){return c.currentLimit<=c.goalLimit;});}},
+  {id:'debtfree',name:'모든 빚 청산',icon:'👑',check:function(){return items.length>0 && items.every(isCompleted);}},
+  {id:'master',name:'뱃지 마스터',icon:'⭐',check:function(){return BADGES.slice(0,-1).every(function(b){return b.check();});}}
+];
+function renderBadges(){
+  var unlocked=BADGES.filter(function(b){return b.check();});
+  document.getElementById('badge-count').textContent=unlocked.length+'/'+BADGES.length;
+  document.getElementById('badge-grid').innerHTML=BADGES.map(function(b){
+    var on=b.check();
+    return '<div class="badge-item"><div class="badge-icon'+(on?' on':'')+'">'+b.icon+'</div><div class="badge-name">'+b.name+'</div></div>';
+  }).join('');
+}
+function checkBadges(){ if(document.getElementById('tab-done')) renderBadges(); }
+
+// ===== 다크모드 =====
+var DARK_KEY='loan_dark_mode';
+function toggleDarkMode(){
+  var on=document.body.classList.toggle('dark-mode');
+  localStorage.setItem(DARK_KEY, on?'1':'0');
+  document.getElementById('dark-toggle-btn').textContent=on?'🌙':'☀️';
+  updateSettingsDarkLabel();
+}
+function restoreDarkMode(){
+  var on=localStorage.getItem(DARK_KEY)==='1';
+  document.body.classList.toggle('dark-mode', on);
+  document.getElementById('dark-toggle-btn').textContent=on?'🌙':'☀️';
+}
+function updateSettingsDarkLabel(){
+  var el=document.getElementById('settings-dark-state');
+  if(el) el.textContent=document.body.classList.contains('dark-mode')?'켜짐':'꺼짐';
+}
+
+// ===== 설정/백업 =====
+function openSettingsModal(){ updateSettingsDarkLabel(); document.getElementById('settings-modal').classList.add('open'); }
+function closeSettingsModal(){ document.getElementById('settings-modal').classList.remove('open'); }
+function openBackupModal(){ closeSettingsModal(); document.getElementById('backup-modal').classList.add('open'); }
+function closeBackupModal(){ document.getElementById('backup-modal').classList.remove('open'); }
+
+function downloadBackup(){
+  var backup={app:'loan_tracker', exportedAt:new Date().toISOString(), items:items, cards:cards};
+  var blob=new Blob([JSON.stringify(backup,null,2)],{type:'application/json'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url; a.download='loan_backup_'+new Date().toISOString().slice(0,10)+'.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('⬇️ 백업 파일이 다운로드됐어요!');
+}
+function restoreBackup(ev){
+  var file=ev.target.files[0]; if(!file) return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      var backup=JSON.parse(e.target.result);
+      if(!backup.items && !backup.cards){ toast('올바른 백업 파일이 아니에요!'); return; }
+      if(!confirm('현재 데이터를 백업 파일 내용으로 덮어쓸까요?\n(기존 데이터는 사라져요)')) return;
+      items=backup.items||[];
+      cards=backup.cards||[];
+      save();
+      saveCards();
+      renderHome(); renderDone(); renderCards();
+      closeBackupModal();
+      toast('✅ 복원됐어요!');
+    }catch(err){ toast('파일을 읽을 수 없어요!'); }
+  };
+  reader.readAsText(file);
+  ev.target.value='';
+}
+
+// ===== 초기화 =====
+load();
+loadCards();
+restoreDarkMode();
+renderCatOptions();
+checkAutoCompletions();
+renderHome();
+</script>
+</body>
+</html>
