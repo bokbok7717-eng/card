@@ -191,22 +191,19 @@ body.dark-mode .celebrate-sub{color:#6a7690}
 <!-- 탭1: 홈 -->
 <div class="tab-content active" id="tab-home">
   <div class="summary-card" id="summary-card"></div>
-  <div id="card-summary-area"></div>
+
+  <div class="box" style="display:flex;justify-content:space-between;align-items:center">
+    <div class="box-title" style="margin-bottom:0">💳 내 카드</div>
+    <button onclick="openCardFormModal()" style="background:#3d5a99;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;cursor:pointer;font-family:inherit">+ 카드 추가</button>
+  </div>
+  <div id="card-list"></div>
+
   <div class="filter-row">
     <button class="ff active" onclick="setFilter('all',this)">전체</button>
     <button class="ff" onclick="setFilter('installment',this)">💳 할부</button>
     <button class="ff" onclick="setFilter('loan',this)">🏦 대출</button>
   </div>
   <div id="item-list"></div>
-</div>
-
-<!-- 탭: 카드값 관리 -->
-<div class="tab-content" id="tab-cards">
-  <div class="box" style="display:flex;justify-content:space-between;align-items:center">
-    <div class="box-title" style="margin-bottom:0">💳 내 카드</div>
-    <button onclick="openCardFormModal()" style="background:#3d5a99;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;cursor:pointer;font-family:inherit">+ 카드 추가</button>
-  </div>
-  <div id="card-list"></div>
 </div>
 
 <!-- 탭2: 추가 -->
@@ -301,7 +298,6 @@ body.dark-mode .celebrate-sub{color:#6a7690}
 
 <nav class="tab-bar">
   <button class="tb active" id="tbtn-home" onclick="goTab('home')"><span class="ic">🏠</span>홈</button>
-  <button class="tb" id="tbtn-cards" onclick="goTab('cards')"><span class="ic">💳</span>카드</button>
   <button class="tb" id="tbtn-add" onclick="goTab('add')"><span class="ic">➕</span>추가</button>
   <button class="tb" id="tbtn-done" onclick="goTab('done')"><span class="ic">✅</span>완납기록</button>
 </nav>
@@ -404,7 +400,6 @@ function goTab(id){
   document.getElementById('tbtn-'+id).classList.add('active');
   if(id==='home') renderHome();
   if(id==='done') renderDone();
-  if(id==='cards') renderCards();
 }
 
 function setFilter(f, btn){
@@ -462,19 +457,7 @@ function renderHome(){
   } else {
     listEl.innerHTML=list.map(itemCardHtml).join('');
   }
-  renderCardSummaryOnHome();
-}
-
-function renderCardSummaryOnHome(){
-  var el=document.getElementById('card-summary-area');
-  if(!el) return;
-  if(cards.length===0){ el.innerHTML=''; return; }
-  var totalBalance=cards.reduce(function(s,c){return s+c.currentBalance;},0);
-  var goalReachedCount=cards.filter(function(c){return c.currentLimit<=c.goalLimit;}).length;
-  el.innerHTML='<div class="box" onclick="goTab(\'cards\')" style="cursor:pointer;margin-bottom:12px">'
-    +'<div class="box-title" style="justify-content:space-between"><span>💳 카드값 현황</span><span style="color:#a0acc4;font-weight:400;font-size:11px">'+cards.length+'장 관리 중</span></div>'
-    +'<div class="ic-meta"><span>총 카드값 '+totalBalance.toLocaleString()+'원</span><span>목표 달성 '+goalReachedCount+'/'+cards.length+'</span></div>'
-    +'</div>';
+  renderCards();
 }
 
 function itemCardHtml(item){
