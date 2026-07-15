@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>💳 상환 관리장</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#f4f7fc;font-family:sans-serif;padding-bottom:70px}
@@ -56,6 +57,16 @@ body{background:#f4f7fc;font-family:sans-serif;padding-bottom:70px}
 .empty-state{text-align:center;padding:50px 20px;color:#b8c2d8}
 .empty-state .ei{font-size:50px;margin-bottom:10px}
 .empty-state p{font-size:13px;line-height:1.6}
+
+/* 다가오는 결제 배너 */
+.due-section-label{font-size:11px;font-weight:700;color:#8b96b0;margin:0 0 6px 2px}
+.due-row{background:#fff;border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:10px;box-shadow:0 1px 4px rgba(61,90,153,.05);margin-bottom:8px;border:1.5px solid #ffe2bb}
+.due-row.urgent{border-color:#ffd2ca}
+.due-dday{flex-shrink:0;font-size:11px;font-weight:700;padding:5px 8px;border-radius:8px;background:#fff3e0;color:#e08a3d}
+.due-dday.urgent{background:#fff0ee;color:#e05a4a}
+.due-name{font-size:13px;font-weight:700;color:#2a3550}
+.due-sub{font-size:11px;color:#a0acc4;margin-top:1px}
+.due-close{flex-shrink:0;background:none;border:none;color:#c8d0e4;font-size:16px;cursor:pointer;padding:4px}
 
 /* 폼 */
 .form-group{margin-bottom:12px}
@@ -176,6 +187,13 @@ body.dark-mode .modal-close-btn{border-color:#2a3345;color:#6a7690}
 body.dark-mode .settings-row{border-bottom-color:#2a3345;color:#e8ecf5}
 body.dark-mode .celebrate-title{color:#e8ecf5}
 body.dark-mode .celebrate-sub{color:#6a7690}
+body.dark-mode .due-section-label{color:#6a7690}
+body.dark-mode .due-row{background:#1e2430;border-color:#3a2a18}
+body.dark-mode .due-row.urgent{border-color:#3a1e1e}
+body.dark-mode .due-dday{background:#3a2a18;color:#ff9d5a}
+body.dark-mode .due-dday.urgent{background:#3a1e1e;color:#ff7a6a}
+body.dark-mode .due-name{color:#e8ecf5}
+body.dark-mode .due-sub{color:#6a7690}
 </style>
 </head>
 <body>
@@ -190,6 +208,7 @@ body.dark-mode .celebrate-sub{color:#6a7690}
 
 <!-- 탭1: 홈 -->
 <div class="tab-content active" id="tab-home">
+  <div id="due-banner-list"></div>
   <div class="summary-card" id="summary-card"></div>
 
   <div class="box" style="display:flex;justify-content:space-between;align-items:center">
@@ -241,20 +260,26 @@ body.dark-mode .celebrate-sub{color:#6a7690}
     </div>
 
     <div class="form-group">
-      <label>월 납입액 (원) *</label>
+      <label id="f-monthly-label">월 납입액 (원) *</label>
       <input type="number" class="form-inp" id="f-monthly" placeholder="자동 계산되지만 직접 수정 가능해요">
       <div class="hint-text" id="monthly-hint"></div>
     </div>
 
     <div class="form-row">
       <div class="form-group">
-        <label>시작월 *</label>
-        <input type="month" class="form-inp" id="f-start">
+        <label>시작일 *</label>
+        <input type="date" class="form-inp" id="f-start">
       </div>
       <div class="form-group">
         <label>이자율 % (선택)</label>
-        <input type="number" class="form-inp" id="f-rate" placeholder="예: 3.5" step="0.1">
+        <input type="number" class="form-inp" id="f-rate" placeholder="예: 3.5" step="0.1" oninput="suggestMonthly()">
       </div>
+    </div>
+
+    <div class="form-group" id="interest-day-group" style="display:none">
+      <label>이자 납입일 (매월 며칠, 선택)</label>
+      <input type="number" class="form-inp" id="f-interest-day" placeholder="예: 25" min="1" max="31">
+      <div class="hint-text">일시상환 대출이라면, 매달 이자만 내는 날짜예요. 입력하면 결제 임박 배너에 떠요.</div>
     </div>
 
     <div class="form-group">
@@ -269,6 +294,12 @@ body.dark-mode .celebrate-sub{color:#6a7690}
 
 <!-- 탭3: 완납 기록 -->
 <div class="tab-content" id="tab-done">
+  <div class="box">
+    <div class="box-title">📉 총 남은 원금 추이</div>
+    <div style="height:180px;position:relative">
+      <canvas id="debt-chart"></canvas>
+    </div>
+  </div>
   <div class="box">
     <div class="box-title">✅ 완납한 것들</div>
     <div id="done-list"></div>
@@ -350,6 +381,10 @@ body.dark-mode .celebrate-sub{color:#6a7690}
       <label>현재 카드값 (사용액, 원)</label>
       <input type="number" class="form-inp" id="cf-balance" placeholder="예: 850000">
     </div>
+    <div class="form-group">
+      <label>결제일 (매월 며칠, 선택)</label>
+      <input type="number" class="form-inp" id="cf-dueday" placeholder="예: 25" min="1" max="31">
+    </div>
     <div class="hint-text" style="margin-bottom:10px">한도는 낮추는 게 목표니까, 목표 한도는 지금보다 낮은 금액으로 넣어주세요.</div>
     <button class="save-btn" onclick="saveCard()">💾 저장</button>
     <button class="modal-close-btn" onclick="closeCardFormModal()">취소</button>
@@ -422,7 +457,10 @@ function getPaidMonths(item){
   return elapsed;
 }
 function getRemainingMonths(item){ return item.totalMonths-getPaidMonths(item); }
-function getRemainingAmount(item){ return Math.max(0, getRemainingMonths(item)*item.monthlyPayment); }
+function getRemainingAmount(item){
+  if(item.type==='loan') return isCompleted(item) ? 0 : item.principal;
+  return Math.max(0, getRemainingMonths(item)*item.monthlyPayment);
+}
 function getPayoffYM(item){
   var s=item.startDate.split('-');
   var y=+s[0], m=+s[1]+item.totalMonths-1;
@@ -430,14 +468,160 @@ function getPayoffYM(item){
   m = ((m-1)%12)+1;
   return y+'-'+String(m).padStart(2,'0');
 }
+function getPayoffDate(item){
+  var s=item.startDate.split('-');
+  var day=s[2]?+s[2]:1;
+  var y=+s[0], m=+s[1]+item.totalMonths-1;
+  y += Math.floor((m-1)/12);
+  m = ((m-1)%12)+1;
+  var lastDay=new Date(y,m,0).getDate();
+  var d=Math.min(day,lastDay);
+  return y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+}
+function getRemainingDays(item){
+  var pd=new Date(getPayoffDate(item)+'T00:00:00');
+  var today=new Date(); today.setHours(0,0,0,0);
+  return Math.max(0, Math.round((pd-today)/86400000));
+}
+function fmtDateKR(dateStr){
+  var p=dateStr.split('-');
+  return p[0]+'년 '+parseInt(p[1])+'월'+(p[2]?' '+parseInt(p[2])+'일':'');
+}
 function isCompleted(item){ return !!item.completed || getRemainingMonths(item)<=0; }
 function getTotalPaidAmount(){
   return items.reduce(function(sum,item){ return sum+getPaidMonths(item)*item.monthlyPayment; },0);
 }
 function fmtYM(ym){ var p=ym.split('-'); return p[0]+'년 '+parseInt(p[1])+'월'; }
 
+// ===== 결제일/이자납입일 D-day 계산 =====
+function getNextOccurrence(day){
+  if(!day) return null;
+  var now=new Date(); now.setHours(0,0,0,0);
+  function build(y,m,d){
+    var lastDay=new Date(y,m,0).getDate();
+    return new Date(y,m-1,Math.min(d,lastDay));
+  }
+  var y=now.getFullYear(), m=now.getMonth()+1;
+  var occ=build(y,m,day);
+  if(occ<now){ m+=1; if(m>12){m=1;y+=1;} occ=build(y,m,day); }
+  return occ;
+}
+function fmtMD(d){ return (d.getMonth()+1)+'월 '+d.getDate()+'일'; }
+var DISMISSED_KEY='loan_dismissed_dues_v1';
+var dismissedDues={};
+function loadDismissedDues(){
+  try{ var r=localStorage.getItem(DISMISSED_KEY); if(r) dismissedDues=JSON.parse(r); }catch(e){ dismissedDues={}; }
+}
+function saveDismissedDues(){ localStorage.setItem(DISMISSED_KEY, JSON.stringify(dismissedDues)); }
+function getUpcomingDues(){
+  var today=new Date(); today.setHours(0,0,0,0);
+  var res=[];
+  cards.forEach(function(c){
+    if(!c.dueDay) return;
+    var occ=getNextOccurrence(c.dueDay);
+    var days=Math.round((occ-today)/86400000);
+    if(days<=3){
+      res.push({key:'card-'+c.id+'-'+getYM(occ), dday:days<=0?'D-DAY':'D-'+days, urgent:days<=0, icon:'💳', name:c.name+' 결제일', sub:fmtMD(occ)+' 예정', amt:c.currentBalance, days:days});
+    }
+  });
+  items.forEach(function(it){
+    if(isCompleted(it)) return;
+    if(it.type==='loan' && it.interestDay){
+      var occ=getNextOccurrence(it.interestDay);
+      var days=Math.round((occ-today)/86400000);
+      if(days<=3){
+        res.push({key:'interest-'+it.id+'-'+getYM(occ), dday:days<=0?'D-DAY':'D-'+days, urgent:days<=0, icon:'🏦', name:it.name+' 이자 납입일', sub:fmtMD(occ)+' · 이자', amt:it.monthlyPayment, days:days});
+      }
+    }
+    if(it.type==='loan'){
+      var pd=new Date(getPayoffDate(it)+'T00:00:00');
+      var days2=Math.round((pd-today)/86400000);
+      if(days2>=0 && days2<=30){
+        res.push({key:'maturity-'+it.id+'-'+getYM(pd), dday:days2<=0?'D-DAY':'D-'+days2, urgent:days2<=3, icon:'🏁', name:it.name+' 만기일', sub:fmtDateKR(getPayoffDate(it))+' 일시상환', amt:it.principal, days:days2});
+      }
+    }
+  });
+  res.sort(function(a,b){return a.days-b.days;});
+  return res;
+}
+function renderDueBanners(){
+  var wrap=document.getElementById('due-banner-list');
+  if(!wrap) return;
+  var list=getUpcomingDues().filter(function(d){return !dismissedDues[d.key];});
+  if(list.length===0){ wrap.innerHTML=''; return; }
+  wrap.innerHTML='<div class="due-section-label">🔔 다가오는 결제</div>'
+    +list.map(function(d){
+      return '<div class="due-row'+(d.urgent?' urgent':'')+'">'
+        +'<div class="due-dday'+(d.urgent?' urgent':'')+'">'+d.dday+'</div>'
+        +'<div style="flex:1;min-width:0">'
+          +'<div class="due-name">'+d.icon+' '+d.name+'</div>'
+          +'<div class="due-sub">'+d.sub+' · '+d.amt.toLocaleString()+'원</div>'
+        +'</div>'
+        +'<button class="due-close" onclick="dismissDue(\''+d.key+'\')">✕</button>'
+      +'</div>';
+    }).join('');
+}
+function dismissDue(key){ dismissedDues[key]=true; saveDismissedDues(); renderDueBanners(); }
+
+// ===== 총 남은 원금 추이 차트 =====
+function getMonthsAgo(n){
+  var d=new Date();
+  d.setDate(1);
+  d.setMonth(d.getMonth()-n);
+  return getYM(d);
+}
+function getTotalRemainingAtYM(ym){
+  var total=0;
+  items.forEach(function(item){
+    var startYM=item.startDate.slice(0,7);
+    if(startYM>ym) return;
+    if(item.type==='loan'){
+      if(item.completed && item.completedAt){
+        if(getYM(new Date(item.completedAt))<=ym) return;
+      } else if(getPayoffYM(item)<ym){
+        return;
+      }
+      total+=item.principal;
+    } else {
+      var elapsed=monthsBetween(item.startDate, ym)+1;
+      if(elapsed<0) elapsed=0;
+      if(elapsed>item.totalMonths) elapsed=item.totalMonths;
+      if(item.completed && item.completedAt && getYM(new Date(item.completedAt))<=ym) return;
+      total+=Math.max(0,(item.totalMonths-elapsed)*item.monthlyPayment);
+    }
+  });
+  return total;
+}
+var debtChartInstance=null;
+function renderDebtChart(){
+  var canvas=document.getElementById('debt-chart');
+  if(!canvas || typeof Chart==='undefined') return;
+  var months=[];
+  for(var i=5;i>=0;i--){ months.push(getMonthsAgo(i)); }
+  var labels=months.map(function(ym){ return parseInt(ym.split('-')[1])+'월'; });
+  var data=months.map(getTotalRemainingAtYM);
+  var isDark=document.body.classList.contains('dark-mode');
+  var gridColor=isDark?'#2a3345':'#eef2fa';
+  var textColor=isDark?'#6a7690':'#a0acc4';
+  var lineColor=isDark?'#7a9aef':'#3d5a99';
+  if(debtChartInstance) debtChartInstance.destroy();
+  debtChartInstance=new Chart(canvas.getContext('2d'),{
+    type:'line',
+    data:{labels:labels,datasets:[{label:'총 남은 원금',data:data,borderColor:lineColor,backgroundColor:lineColor+'22',fill:true,tension:.3,pointRadius:3,pointBackgroundColor:lineColor}]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return ctx.parsed.y.toLocaleString()+'원';}}}},
+      scales:{
+        y:{beginAtZero:true,grid:{color:gridColor},ticks:{color:textColor,callback:function(v){return (v/10000).toLocaleString()+'만';}}},
+        x:{grid:{display:false},ticks:{color:textColor}}
+      }
+    }
+  });
+}
+
 // ===== 홈 렌더 =====
 function renderHome(){
+  renderDueBanners();
   var all=items.filter(function(i){return !isCompleted(i);});
   var thisMonthTotal=all.reduce(function(s,i){return s+i.monthlyPayment;},0);
   var totalRemaining=all.reduce(function(s,i){return s+getRemainingAmount(i);},0);
@@ -463,13 +647,18 @@ function renderHome(){
 function itemCardHtml(item){
   var paid=getPaidMonths(item), remain=getRemainingMonths(item);
   var pct=Math.round(paid/item.totalMonths*100);
-  var payoff=getPayoffYM(item);
+  var isLoan=item.type==='loan';
+  var payoffLabel=isLoan?fmtDateKR(getPayoffDate(item)):fmtYM(getPayoffYM(item));
+  var metaLeft = isLoan ? ('만기까지 '+getRemainingDays(item)+'일') : (paid+'/'+item.totalMonths+'개월 ('+pct+'%)');
+  var metaRight = isLoan ? ('만기 '+payoffLabel) : (remain>0?remain+'개월 남음':'이번달 완납');
+  var bottomLeft = isLoan ? ('대출금액 '+item.principal.toLocaleString()+'원') : ('잔액 '+getRemainingAmount(item).toLocaleString()+'원');
+  var bottomRight = isLoan ? ('이자 '+item.monthlyPayment.toLocaleString()+'원'+(item.interestDay?' · 매달 '+item.interestDay+'일':'')) : ('완납예정 '+payoffLabel);
   return '<div class="item-card" onclick="openDetail(\''+item.id+'\')">'
     +'<div class="ic-top"><span class="ic-type '+(item.type==='loan'?'type-loan':'type-installment')+'">'+(item.type==='loan'?'🏦 대출':'💳 할부')+'</span><span class="ic-cat">'+item.category+'</span></div>'
     +'<div class="ic-name">'+item.name+'</div>'
     +'<div class="ic-progress-bar"><div class="ic-progress-fill" style="width:'+pct+'%"></div></div>'
-    +'<div class="ic-meta"><span>'+paid+'/'+item.totalMonths+'개월 ('+pct+'%)</span><span>'+(remain>0?remain+'개월 남음':'이번달 완납')+'</span></div>'
-    +'<div class="ic-bottom"><span class="ic-remain">잔액 '+getRemainingAmount(item).toLocaleString()+'원</span><span class="ic-payoff">완납예정 '+fmtYM(payoff)+'</span></div>'
+    +'<div class="ic-meta"><span>'+metaLeft+'</span><span>'+metaRight+'</span></div>'
+    +'<div class="ic-bottom"><span class="ic-remain">'+bottomLeft+'</span><span class="ic-payoff">'+bottomRight+'</span></div>'
     +'</div>';
 }
 
@@ -506,6 +695,7 @@ function openCardFormModal(){
   document.getElementById('cf-limit').value='';
   document.getElementById('cf-goal').value='';
   document.getElementById('cf-balance').value='';
+  document.getElementById('cf-dueday').value='';
   document.getElementById('card-form-modal').classList.add('open');
 }
 function closeCardFormModal(){ document.getElementById('card-form-modal').classList.remove('open'); }
@@ -515,6 +705,7 @@ function saveCard(){
   var limit=+document.getElementById('cf-limit').value;
   var goal=+document.getElementById('cf-goal').value;
   var balance=+document.getElementById('cf-balance').value||0;
+  var dueDay=+document.getElementById('cf-dueday').value||null;
   if(!name){toast('카드 이름을 입력해주세요!');return;}
   if(!limit||limit<=0){toast('현재 한도를 입력해주세요!');return;}
   if(!goal||goal<=0){toast('목표 한도를 입력해주세요!');return;}
@@ -523,7 +714,11 @@ function saveCard(){
     id:Date.now()+'', name:name,
     startLimit:limit, currentLimit:limit, goalLimit:goal,
     currentBalance:balance, balanceUpdatedAt:Date.now(),
+    dueDay:dueDay,
     limitHistory:[{date:fmtDateToday(), limit:limit, memo:'최초 등록'}],
+    balanceHistory:[{date:fmtDateToday(), balance:balance}],
+    goalHistory:[{date:fmtDateToday(), goal:goal, memo:'최초 목표 설정'}],
+    goalReachedCount:0,
     createdAt:Date.now()
   });
   saveCards();
@@ -556,12 +751,29 @@ function openCardDetail(id){
   body+='</div>';
 
   body+='<button class="save-btn" style="margin-bottom:8px" onclick="promptLowerLimit(\''+c.id+'\')">📉 한도 낮췄어요</button>';
+  body+='<button class="save-btn" style="background:#4caf6f;margin-bottom:8px" onclick="promptNewGoal(\''+c.id+'\')">🎯 새 목표 설정</button>';
   body+='<button class="save-btn" style="background:#5b7cca;margin-bottom:8px" onclick="promptUpdateBalance(\''+c.id+'\')">🔄 카드값 업데이트</button>';
 
   if(c.limitHistory && c.limitHistory.length>0){
     body+='<div class="box"><div class="box-title">📜 한도 변경 이력</div>';
     c.limitHistory.slice().reverse().forEach(function(h){
       body+='<div class="dp-info-row"><span class="dp-info-label">'+h.date+(h.memo?' · '+h.memo:'')+'</span><span class="dp-info-value">'+h.limit.toLocaleString()+'원</span></div>';
+    });
+    body+='</div>';
+  }
+
+  if(c.goalHistory && c.goalHistory.length>0){
+    body+='<div class="box"><div class="box-title">🎯 목표 변경 이력</div>';
+    c.goalHistory.slice().reverse().forEach(function(h){
+      body+='<div class="dp-info-row"><span class="dp-info-label">'+h.date+(h.memo?' · '+h.memo:'')+'</span><span class="dp-info-value">'+h.goal.toLocaleString()+'원</span></div>';
+    });
+    body+='</div>';
+  }
+
+  if(c.balanceHistory && c.balanceHistory.length>0){
+    body+='<div class="box"><div class="box-title">📊 카드값 변화 이력</div>';
+    c.balanceHistory.slice().reverse().forEach(function(h){
+      body+='<div class="dp-info-row"><span class="dp-info-label">'+h.date+'</span><span class="dp-info-value">'+h.balance.toLocaleString()+'원</span></div>';
     });
     body+='</div>';
   }
@@ -581,14 +793,45 @@ function promptLowerLimit(id){
   var num=parseInt(val.replace(/[^0-9]/g,''));
   if(!num||num<=0){ toast('올바른 숫자를 입력해주세요'); return; }
   var memo=prompt('메모 (선택 입력, 없으면 그냥 확인 눌러도 돼요)','')||'';
+  var wasReached = c.currentLimit<=c.goalLimit;
   if(!c.limitHistory) c.limitHistory=[];
   c.limitHistory.push({date:fmtDateToday(), limit:num, memo:memo});
   c.currentLimit=num;
+  var nowReached = num<=c.goalLimit;
+  if(nowReached && !wasReached){ c.goalReachedCount=(c.goalReachedCount||0)+1; }
   saveCards();
   openCardDetail(id);
   renderCards();
   renderHome();
-  toast(num<=c.goalLimit?'🎯 목표 한도 달성했어요!':'📉 한도가 낮아졌어요');
+  toast(nowReached?'🎯 목표 한도 달성했어요!':'📉 한도가 낮아졌어요');
+  checkBadges();
+  if(nowReached && !wasReached){
+    setTimeout(function(){
+      if(confirm('축하해요! 목표 한도를 달성했어요 🎉\n이어서 다음 목표를 새로 설정할까요?')){
+        promptNewGoal(id);
+      }
+    },300);
+  }
+}
+function promptNewGoal(id){
+  var c=cards.find(function(x){return x.id===id;});
+  if(!c) return;
+  var suggested=Math.max(0, c.currentLimit-1000000);
+  var val=prompt('새 목표 한도를 입력해주세요 (원)\n현재 한도: '+c.currentLimit.toLocaleString()+'원', suggested);
+  if(val===null) return;
+  var num=parseInt(val.replace(/[^0-9]/g,''));
+  if(!num||num<0){ toast('올바른 숫자를 입력해주세요'); return; }
+  if(num>=c.currentLimit){ toast('현재 한도보다 낮은 금액을 목표로 설정해주세요'); return; }
+  var memo=prompt('메모 (선택 입력, 없으면 그냥 확인 눌러도 돼요)','')||'';
+  if(!c.goalHistory) c.goalHistory=[];
+  c.goalHistory.push({date:fmtDateToday(), goal:num, memo:memo});
+  c.goalLimit=num;
+  c.startLimit=c.currentLimit; // 새 라운드 시작점으로 재설정 (진행률이 0%부터 다시 시작)
+  saveCards();
+  openCardDetail(id);
+  renderCards();
+  renderHome();
+  toast('🎯 새 목표를 설정했어요!');
   checkBadges();
 }
 function promptUpdateBalance(id){
@@ -598,6 +841,8 @@ function promptUpdateBalance(id){
   if(val===null) return;
   var num=parseInt(val.replace(/[^0-9]/g,''));
   if(isNaN(num)||num<0){ toast('올바른 숫자를 입력해주세요'); return; }
+  if(!c.balanceHistory) c.balanceHistory=[];
+  c.balanceHistory.push({date:fmtDateToday(), balance:num});
   c.currentBalance=num;
   c.balanceUpdatedAt=Date.now();
   saveCards();
@@ -623,6 +868,10 @@ function setType(t){
   document.getElementById('type-installment-btn').classList.toggle('active', t==='installment');
   document.getElementById('type-loan-btn').classList.toggle('active', t==='loan');
   renderCatOptions();
+  document.getElementById('f-monthly-label').textContent = t==='loan' ? '이번달 납입 이자 (원) *' : '월 납입액 (원) *';
+  document.getElementById('f-monthly').placeholder = t==='loan' ? '예: 12500 (매달 내는 이자)' : '자동 계산되지만 직접 수정 가능해요';
+  document.getElementById('interest-day-group').style.display = t==='loan' ? 'block' : 'none';
+  suggestMonthly();
 }
 function renderCatOptions(){
   var sel=document.getElementById('f-cat');
@@ -630,9 +879,21 @@ function renderCatOptions(){
   sel.innerHTML=cats.map(function(c){return '<option>'+c+'</option>';}).join('');
 }
 function suggestMonthly(){
+  var hint=document.getElementById('monthly-hint');
+  if(curType==='loan'){
+    var principal=+document.getElementById('f-principal').value||0;
+    var rate=+document.getElementById('f-rate').value||0;
+    if(principal>0 && rate>0){
+      var monthlyInterest=Math.round(principal*(rate/100)/12);
+      document.getElementById('f-monthly').value=monthlyInterest;
+      hint.textContent='총 금액 × 이자율 ÷ 12로 자동 계산했어요. 실제 청구 이자가 다르면 직접 수정하세요.';
+    } else {
+      hint.textContent='';
+    }
+    return;
+  }
   var principal=+document.getElementById('f-principal').value||0;
   var months=+document.getElementById('f-months').value||0;
-  var hint=document.getElementById('monthly-hint');
   if(principal>0 && months>0){
     var suggested=Math.round(principal/months);
     document.getElementById('f-monthly').value=suggested;
@@ -651,12 +912,13 @@ function saveItem(){
   var cat=document.getElementById('f-cat').value;
   var rate=document.getElementById('f-rate').value;
   var memo=document.getElementById('f-memo').value.trim();
+  var interestDay = curType==='loan' ? (+document.getElementById('f-interest-day').value||null) : null;
 
   if(!name){toast('이름을 입력해주세요!');return;}
   if(!principal||principal<=0){toast('총 금액을 입력해주세요!');return;}
   if(!months||months<=0){toast('총 개월수를 입력해주세요!');return;}
   if(!monthly||monthly<=0){toast('월 납입액을 입력해주세요!');return;}
-  if(!start){toast('시작월을 선택해주세요!');return;}
+  if(!start){toast('시작일을 선택해주세요!');return;}
 
   if(editingId){
     var it=items.find(function(x){return x.id===editingId;});
@@ -664,6 +926,7 @@ function saveItem(){
       it.name=name; it.type=curType; it.category=cat;
       it.principal=principal; it.totalMonths=months; it.monthlyPayment=monthly;
       it.startDate=start; it.interestRate=rate?parseFloat(rate):null; it.memo=memo;
+      it.interestDay=interestDay;
     }
     toast('✅ 수정됐어요!');
   } else {
@@ -671,6 +934,7 @@ function saveItem(){
       id:Date.now()+'', type:curType, name:name, category:cat,
       principal:principal, totalMonths:months, monthlyPayment:monthly,
       startDate:start, interestRate:rate?parseFloat(rate):null, memo:memo,
+      interestDay:interestDay,
       completed:false, completedAt:null, createdAt:Date.now()
     });
     toast('✅ 등록됐어요!');
@@ -693,6 +957,7 @@ function resetForm(){
   document.getElementById('f-start').value='';
   document.getElementById('f-rate').value='';
   document.getElementById('f-memo').value='';
+  document.getElementById('f-interest-day').value='';
   document.getElementById('monthly-hint').textContent='';
   setType('installment');
 }
@@ -706,22 +971,25 @@ function openDetail(id){
   document.getElementById('dp-name').textContent=item.name;
   var paid=getPaidMonths(item), remain=getRemainingMonths(item);
   var pct=Math.round(paid/item.totalMonths*100);
-  var payoff=getPayoffYM(item);
   var completed=isCompleted(item);
+  var isLoan=item.type==='loan';
+  var payoffLabel=isLoan?fmtDateKR(getPayoffDate(item)):fmtYM(getPayoffYM(item));
 
   var body='<div class="dp-hero">';
   body+='<div class="dp-hero-remain">'+(completed?'완납 완료 🎉':getRemainingAmount(item).toLocaleString()+'원 남음')+'</div>';
-  body+='<div class="dp-hero-label">'+(completed?'수고하셨어요!':remain+'개월 남았어요 · 완납예정 '+fmtYM(payoff))+'</div>';
+  body+='<div class="dp-hero-label">'+(completed?'수고하셨어요!':remain+'개월 남았어요 · 만기 '+payoffLabel)+'</div>';
   body+='<div class="dp-hero-bar"><div class="dp-hero-fill" style="width:'+pct+'%"></div></div>';
-  body+='<div style="font-size:11px;color:#a0acc4">'+paid+' / '+item.totalMonths+'개월 납입 ('+pct+'%)</div>';
+  body+='<div style="font-size:11px;color:#a0acc4">'+paid+' / '+item.totalMonths+'개월 경과 ('+pct+'%)'+(isLoan&&!completed?' · 일시상환이라 원금은 만기까지 동일해요':'')+'</div>';
   body+='</div>';
 
   body+='<div class="box">';
-  body+='<div class="dp-info-row"><span class="dp-info-label">종류</span><span class="dp-info-value">'+(item.type==='loan'?'🏦 대출':'💳 할부')+'</span></div>';
+  body+='<div class="dp-info-row"><span class="dp-info-label">종류</span><span class="dp-info-value">'+(isLoan?'🏦 대출':'💳 할부')+'</span></div>';
   body+='<div class="dp-info-row"><span class="dp-info-label">카테고리</span><span class="dp-info-value">'+item.category+'</span></div>';
   body+='<div class="dp-info-row"><span class="dp-info-label">총 금액</span><span class="dp-info-value">'+item.principal.toLocaleString()+'원</span></div>';
-  body+='<div class="dp-info-row"><span class="dp-info-label">월 납입액</span><span class="dp-info-value">'+item.monthlyPayment.toLocaleString()+'원</span></div>';
-  body+='<div class="dp-info-row"><span class="dp-info-label">시작월</span><span class="dp-info-value">'+fmtYM(item.startDate)+'</span></div>';
+  body+='<div class="dp-info-row"><span class="dp-info-label">'+(isLoan?'이번달 납입 이자':'월 납입액')+'</span><span class="dp-info-value">'+item.monthlyPayment.toLocaleString()+'원</span></div>';
+  body+='<div class="dp-info-row"><span class="dp-info-label">시작일</span><span class="dp-info-value">'+fmtDateKR(item.startDate)+'</span></div>';
+  if(isLoan) body+='<div class="dp-info-row"><span class="dp-info-label">만기일</span><span class="dp-info-value">'+fmtDateKR(getPayoffDate(item))+'</span></div>';
+  if(isLoan && item.interestDay) body+='<div class="dp-info-row"><span class="dp-info-label">이자 납입일</span><span class="dp-info-value">매달 '+item.interestDay+'일</span></div>';
   if(item.interestRate) body+='<div class="dp-info-row"><span class="dp-info-label">이자율</span><span class="dp-info-value">'+item.interestRate+'%</span></div>';
   body+='</div>';
 
@@ -754,10 +1022,11 @@ function editItem(id){
   document.getElementById('f-principal').value=item.principal;
   document.getElementById('f-months').value=item.totalMonths;
   document.getElementById('f-monthly').value=item.monthlyPayment;
-  document.getElementById('f-start').value=item.startDate;
+  document.getElementById('f-start').value=item.startDate.length===7 ? item.startDate+'-01' : item.startDate;
   document.getElementById('f-rate').value=item.interestRate||'';
   document.getElementById('f-memo').value=item.memo||'';
   document.getElementById('f-cat').value=item.category;
+  document.getElementById('f-interest-day').value=item.interestDay||'';
 }
 
 function deleteItem(id){
@@ -816,6 +1085,7 @@ function closeCelebrateModal(){ document.getElementById('celebrate-modal').class
 
 // ===== 완납 기록 탭 =====
 function renderDone(){
+  renderDebtChart();
   var done=items.filter(isCompleted).sort(function(a,b){return (b.completedAt||0)-(a.completedAt||0);});
   var listEl=document.getElementById('done-list');
   if(done.length===0){
@@ -841,7 +1111,7 @@ var BADGES=[
   {id:'paid100',name:'누적상환 100만',icon:'💰',check:function(){return getTotalPaidAmount()>=1000000;}},
   {id:'paid1000',name:'누적상환 1000만',icon:'💎',check:function(){return getTotalPaidAmount()>=10000000;}},
   {id:'firstlower',name:'첫 한도 인하',icon:'📉',check:function(){return cards.some(function(c){return c.limitHistory && c.limitHistory.length>1;});}},
-  {id:'goalcard',name:'카드 목표 달성',icon:'🎯',check:function(){return cards.some(function(c){return c.currentLimit<=c.goalLimit;});}},
+  {id:'goalcard',name:'카드 목표 달성',icon:'🎯',check:function(){return cards.some(function(c){return (c.goalReachedCount||0)>=1;});}},
   {id:'debtfree',name:'모든 빚 청산',icon:'👑',check:function(){return items.length>0 && items.every(isCompleted);}},
   {id:'master',name:'뱃지 마스터',icon:'⭐',check:function(){return BADGES.slice(0,-1).every(function(b){return b.check();});}}
 ];
@@ -913,6 +1183,7 @@ function restoreBackup(ev){
 // ===== 초기화 =====
 load();
 loadCards();
+loadDismissedDues();
 restoreDarkMode();
 renderCatOptions();
 checkAutoCompletions();
